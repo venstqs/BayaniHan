@@ -54,7 +54,7 @@ The app runs in **offline demo mode** with sample data until you connect a free 
 
 For EAS cloud builds, add the same two values as [EAS environment variables](https://docs.expo.dev/eas/environment-variables/).
 
-**Maps need no API key.** Tiles come from CARTO with an automatic fallback to OpenStreetMap, and the Leaflet map library is bundled in the app.
+**Maps need no API key.** Tiles come from OpenStreetMap's own servers (with the Humanitarian OSM and OSM France servers as automatic fallbacks), and the Leaflet map library is bundled in the app. CARTO basemaps are not used because they now require an API key.
 
 ## Run it
 
@@ -90,7 +90,7 @@ npx expo-doctor    # dependency and config health
 
 ## Tech stack
 
-[Expo](https://expo.dev) SDK 58 · React Native 0.88 · Expo Router · TypeScript · Supabase (Postgres + Auth, row-level security) · Leaflet maps with OpenStreetMap / CARTO tiles · walking routes from the FOSSGIS OSRM server · AsyncStorage · expo-location · expo-haptics
+[Expo](https://expo.dev) SDK 58 · React Native 0.88 · Expo Router · TypeScript · Supabase (Postgres + Auth, row-level security) · Leaflet maps with OpenStreetMap tiles · walking routes from the FOSSGIS OSRM server · AsyncStorage · expo-location · expo-haptics
 
 ## Project structure
 

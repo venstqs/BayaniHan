@@ -36,6 +36,8 @@ const HTML = `<!DOCTYPE html><html><head>
 <script>${LEAFLET_JS}</script>
 <style>
  html,body,#map{margin:0;padding:0;height:100%;width:100%;background:#EFEBFA}
+ /* Soften the busy OSM colours so the report pins stand out. */
+ .leaflet-tile-pane{filter:saturate(.75) brightness(1.03)}
  .pin{background:none;border:none}
  .me{width:18px;height:18px;border-radius:50%;background:#2F7BFF;border:3px solid #fff;box-sizing:border-box;box-shadow:0 0 0 0 rgba(47,123,255,.5);animation:pulse 2s infinite}
  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(47,123,255,.5)}70%{box-shadow:0 0 0 16px rgba(47,123,255,0)}100%{box-shadow:0 0 0 0 rgba(47,123,255,0)}}
@@ -46,10 +48,12 @@ const HTML = `<!DOCTYPE html><html><head>
  var post=function(o){window.ReactNativeWebView&&window.ReactNativeWebView.postMessage(JSON.stringify(o))};
  if(typeof L==='undefined'){post({type:'offline'});}
  var map=L.map('map',{zoomControl:false,attributionControl:true});
- // Map tiles need no API key. CARTO first; if it keeps failing, fall back to OpenStreetMap's own servers.
+ // Map tiles need no API key. CARTO basemaps now return "API key required" images, so we use
+ // OpenStreetMap's own keyless tile servers, with two community-run fallbacks.
  var SOURCES=[
-   {url:'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',o:{maxZoom:19,subdomains:'abcd',attribution:'&copy; OpenStreetMap &copy; CARTO'}},
-   {url:'https://tile.openstreetmap.org/{z}/{x}/{y}.png',o:{maxZoom:19,attribution:'&copy; OpenStreetMap'}}
+   {url:'https://tile.openstreetmap.org/{z}/{x}/{y}.png',o:{maxZoom:19,attribution:'&copy; OpenStreetMap contributors'}},
+   {url:'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',o:{maxZoom:19,subdomains:'abc',attribution:'&copy; OpenStreetMap contributors, Humanitarian OSM Team'}},
+   {url:'https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png',o:{maxZoom:19,subdomains:'abc',attribution:'&copy; OpenStreetMap contributors, OSM France'}}
  ];
  var src=0, tiles=null, errs=0, loads=0, tilesOk=true;
  function useSource(i){
