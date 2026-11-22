@@ -1,25 +1,61 @@
 {
   "expo": {
-    "name": "bayanihan-app",
+    "name": "BayaniHan",
     "slug": "bayanihan-app",
+    "description": "A youth-led safety map for Naga City. Anonymously report unsafe public spaces, take the youth safety survey, and find the right hotline.",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
+    "scheme": "bayanihan",
     "userInterfaceStyle": "light",
+    "primaryColor": "#6C3BFF",
+    "backgroundColor": "#F7F5FF",
+    "githubUrl": "https://github.com/venstqs/BayaniHan",
     "ios": {
-      "supportsTablet": true
+      "bundleIdentifier": "com.venstqs.bayanihan",
+      "buildNumber": "1",
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "BayaniHan uses your location to show where you are on the map and to place a safety report pin. Your location is never linked to your identity."
+      }
     },
     "android": {
+      "package": "com.venstqs.bayanihan",
+      "versionCode": 1,
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#6C3BFF",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
+      "permissions": ["ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION"],
       "predictiveBackGestureEnabled": false
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      "expo-status-bar",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "BayaniHan uses your location to show where you are on the map and to place a safety report pin. Your location is never linked to your identity."
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#6C3BFF"
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
     }
   }
 }
