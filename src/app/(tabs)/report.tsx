@@ -37,6 +37,8 @@ export default function ReportScreen() {
   const [consent, setConsent] = useState(false);
   const [locating, setLocating] = useState(false);
   const [sent, setSent] = useState(false);
+  const [queued, setQueued] = useState(false);
+  const [sending, setSending] = useState(false);
   /** Shown under the map when the barangay was filled in from the pin. */
   const [autoNote, setAutoNote] = useState<string | null>(null);
   // When the barangay is set FROM the pin, don't jump the pin back to the barangay centre.
@@ -100,11 +102,20 @@ export default function ReportScreen() {
   ].filter(Boolean) as string[];
   const canSubmit = missing.length === 0;
 
-  const submit = () => {
-    if (!canSubmit) return;
-    addReport({ barangay: barangay!, category: category!, severity, timeOfDay, group, description: description.trim(), ...point });
-    haptic.success();
-    setSent(true);
+  const submit = async () => {
+    if (!canSubmit || sending) return;
+    setSending(true);
+    try {
+      const res = await addReport({ barangay: barangay!, category: category!, severity, timeOfDay, group, description: description.trim(), ...point });
+      setQueued(res.queued);
+      haptic.success();
+      setSent(true);
+    } catch (e) {
+      haptic.warn();
+      Alert.alert('Report not sent', e instanceof Error ? e.message : 'Please check your answers and try again.');
+    } finally {
+      setSending(false);
+    }
   };
 
   const startOver = () => {
@@ -118,7 +129,7 @@ export default function ReportScreen() {
 
   if (sent) {
     return (
-      <Screen>
+      <Screen tabBarSpace>
         <View style={styles.done}>
           <PopIn>
             <View style={styles.doneIcon}>
@@ -129,10 +140,13 @@ export default function ReportScreen() {
             <Text style={styles.doneTitle}>{t('sentTitle')}</Text>
           </FadeIn>
           <FadeIn delay={250}>
-            <Text style={styles.doneBody}>{t('sentBody')}</Text>
+            <Text style={styles.doneBody}>
+              {queued ? 'You’re offline right now. Your report is saved on this phone and will be sent automatically when you’re back online.' : t('sentBody')}
+            </Text>
           </FadeIn>
           <FadeIn delay={350} style={{ alignSelf: 'stretch', gap: 10, marginTop: 12 }}>
-            <Button title={t('viewMap')} icon="map" onPress={() => { startOver(); router.navigate('/'); }} />
+            <Button title="Track it in My reports" icon="clock" onPress={() => { startOver(); router.push('/my-reports'); }} />
+            <Button title={t('viewMap')} variant="soft" icon="map" onPress={() => { startOver(); router.navigate('/'); }} />
             <Button title={t('reportAnother')} variant="ghost" icon="plus" onPress={startOver} />
           </FadeIn>
         </View>
@@ -143,7 +157,7 @@ export default function ReportScreen() {
   const pinColor = category ? categoryById(category).color : colors.accent;
 
   return (
-    <Screen>
+    <Screen tabBarSpace>
       <PageHeader context="Anonymous, reviewed before it goes public" title={t('reportConcern')} />
       <Pressable
         onPress={() => Linking.openURL('tel:911').catch(() => {})}
@@ -272,7 +286,7 @@ export default function ReportScreen() {
       </Section>
 
       <Checkbox checked={consent} onChange={setConsent} label={t('consent')} />
-      <Button title={t('sendReport')} variant="accent" icon="send" onPress={submit} disabled={!canSubmit} />
+      <Button title={sending ? 'Sending…' : t('sendReport')} variant="accent" icon="send" onPress={submit} disabled={!canSubmit || sending} />
       {!canSubmit ? (
         <Small style={{ textAlign: 'center' }}>
           {t('stillNeeded')} {missing.join(', ')}.

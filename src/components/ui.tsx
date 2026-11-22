@@ -4,6 +4,7 @@ import {
   Animated,
   Easing,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleProp,
   StyleSheet,
@@ -32,20 +33,37 @@ export function Screen({
   scroll = true,
   padded = true,
   edges = ['top'],
+  onRefresh,
+  refreshing = false,
+  tabBarSpace = false,
 }: {
   children: ReactNode;
   scroll?: boolean;
   padded?: boolean;
   /** Pass [] on stack screens that already have a native header. */
   edges?: ('top' | 'bottom')[];
+  /** Enables pull-to-refresh. */
+  onRefresh?: () => void;
+  refreshing?: boolean;
+  /** Leave room at the bottom for the floating tab bar. */
+  tabBarSpace?: boolean;
 }) {
   const [scrollEnabled, setScrollEnabled] = useState(true);
-  const content = <View style={[padded && { padding: 20, paddingBottom: 56 }, { gap: 18 }]}>{children}</View>;
+  const content = (
+    <View style={[padded && { padding: 20, paddingBottom: tabBarSpace ? 130 : 56 }, { gap: 18 }]}>{children}</View>
+  );
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={edges}>
       {scroll ? (
         <ScrollLockContext.Provider value={setScrollEnabled}>
-          <ScrollView keyboardShouldPersistTaps="handled" scrollEnabled={scrollEnabled} contentContainerStyle={{ flexGrow: 1 }}>
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            scrollEnabled={scrollEnabled}
+            contentContainerStyle={{ flexGrow: 1 }}
+            refreshControl={
+              onRefresh ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} /> : undefined
+            }
+          >
             {content}
           </ScrollView>
         </ScrollLockContext.Provider>

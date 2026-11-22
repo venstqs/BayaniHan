@@ -137,7 +137,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           accessibilityLiveRegion="polite"
           style={[
             styles.toastWrap,
-            { bottom: insets.bottom + 84, opacity: v, transform: [{ translateY: v.interpolate({ inputRange: [0, 1], outputRange: [reduce ? 0 : 30, 0] }) }] },
+            { bottom: insets.bottom + 110, opacity: v, transform: [{ translateY: v.interpolate({ inputRange: [0, 1], outputRange: [reduce ? 0 : 30, 0] }) }] },
           ]}
         >
           <View style={styles.toast}>

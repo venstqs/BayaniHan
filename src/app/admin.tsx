@@ -5,8 +5,9 @@ import Moderation from '@/components/admin/Moderation';
 import Ordinances from '@/components/admin/Ordinances';
 import PolicyBuilder from '@/components/admin/PolicyBuilder';
 import Resources from '@/components/admin/Resources';
-import { Body, Button, Card, Field, Notice, PageHeader, Screen, Segmented } from '@/components/ui';
+import { Body, Button, Card, Field, Notice, PageHeader, Screen, Segmented, Small } from '@/components/ui';
 import { colors } from '@/lib/theme';
+import { haptic } from '@/lib/motion';
 import { useStore } from '@/lib/store';
 
 /** Demo-only PIN. Replace with real coordinator accounts when a backend is connected. */
@@ -15,11 +16,39 @@ const DEMO_PIN = '2026';
 type Tab = 'reports' | 'ai' | 'policy' | 'ordinances' | 'resources';
 
 export default function AdminScreen() {
-  const { isAdmin, setAdmin, reports } = useStore();
+  const { isAdmin, setAdmin, reports, online, signIn, signOut, coordinatorEmail, refresh, syncing, syncError } = useStore();
   const pending = reports.filter((r) => r.status === 'pending').length;
   const [pin, setPin] = useState('');
-  const [err, setErr] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>('reports');
+
+  const submit = async () => {
+    setErr(null);
+    if (!online) {
+      if (pin === DEMO_PIN) {
+        haptic.success();
+        setAdmin(true);
+      } else {
+        haptic.warn();
+        setErr('That PIN isn’t right. Check it and try again.');
+      }
+      return;
+    }
+    setBusy(true);
+    try {
+      await signIn(email, password);
+      haptic.success();
+      setPassword('');
+    } catch (e) {
+      haptic.warn();
+      setErr(e instanceof Error ? e.message : 'Could not sign in.');
+    } finally {
+      setBusy(false);
+    }
+  };
 
   if (!isAdmin) {
     return (
@@ -30,27 +59,73 @@ export default function AdminScreen() {
           intro="Barangay youth coordinators and the central team check every report before it reaches the public map."
         />
         <Card>
-          <Field
-            placeholder="Reviewer PIN"
-            value={pin}
-            onChangeText={(v) => {
-              setPin(v);
-              setErr(false);
-            }}
-            secureTextEntry
-            keyboardType="number-pad"
-            maxLength={8}
+          {online ? (
+            <>
+              <Field
+                placeholder="Coordinator email"
+                value={email}
+                onChangeText={(v) => {
+                  setEmail(v);
+                  setErr(null);
+                }}
+                autoCapitalize="none"
+                autoComplete="email"
+                keyboardType="email-address"
+                textContentType="username"
+              />
+              <Field
+                placeholder="Password"
+                value={password}
+                onChangeText={(v) => {
+                  setPassword(v);
+                  setErr(null);
+                }}
+                secureTextEntry
+                autoComplete="password"
+                textContentType="password"
+                onSubmitEditing={submit}
+                returnKeyType="go"
+              />
+            </>
+          ) : (
+            <Field
+              placeholder="Reviewer PIN"
+              value={pin}
+              onChangeText={(v) => {
+                setPin(v);
+                setErr(null);
+              }}
+              secureTextEntry
+              keyboardType="number-pad"
+              maxLength={8}
+              onSubmitEditing={submit}
+            />
+          )}
+          {err ? <Body style={{ color: colors.danger }}>{err}</Body> : null}
+          <Button
+            title={busy ? 'Signing in…' : 'Sign in'}
+            icon="lock"
+            onPress={submit}
+            disabled={busy || (online ? !email.trim() || !password : !pin)}
           />
-          {err ? <Body style={{ color: colors.danger }}>That PIN isn’t right. Check it and try again.</Body> : null}
-          <Button title="Sign in" icon="lock" onPress={() => (pin === DEMO_PIN ? setAdmin(true) : setErr(true))} />
         </Card>
-        <Notice>Demo build: the PIN is {DEMO_PIN}. A real launch needs individual coordinator accounts.</Notice>
+        {online ? (
+          <Notice>Coordinator accounts are created by the BayaniHan team in Supabase. Ask your project lead if you need one.</Notice>
+        ) : (
+          <Notice>Demo mode (no server connected): the PIN is {DEMO_PIN}. Connect Supabase to use real coordinator accounts.</Notice>
+        )}
       </Screen>
     );
   }
 
   return (
-    <Screen edges={[]}>
+    <Screen edges={[]} onRefresh={online ? refresh : undefined} refreshing={syncing}>
+      {online ? (
+        <Small>
+          Signed in as {coordinatorEmail}. Pull down to refresh.
+        </Small>
+      ) : null}
+      {syncError ? <Notice tone="warn">{syncError}</Notice> : null}
       <Segmented<Tab>
         value={tab}
         onChange={setTab}
@@ -69,7 +144,7 @@ export default function AdminScreen() {
         {tab === 'ordinances' && <Ordinances />}
         {tab === 'resources' && <Resources />}
       </View>
-      <Button title="Sign out" variant="ghost" icon="log-out" onPress={() => setAdmin(false)} />
+      <Button title="Sign out" variant="ghost" icon="log-out" onPress={signOut} />
     </Screen>
   );
 }

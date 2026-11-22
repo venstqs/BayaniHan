@@ -3,7 +3,7 @@ import { router } from 'expo-router';
 import * as Location from 'expo-location';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import BarangayPicker from '@/components/BarangayPicker';
 import { LangToggle, Logo } from '@/components/Brand';
 import LeafletMap, { MapMarker } from '@/components/LeafletMap';
@@ -17,7 +17,8 @@ import { chunk, colors, fonts, radius, severityColors, shadow, type } from '@/li
 import type { CategoryId } from '@/lib/types';
 
 export default function MapScreen() {
-  const { reports, barangay, setBarangay } = useStore();
+  const { reports, barangay, setBarangay, confirm, confirmed, outbox, refresh, syncing } = useStore();
+  const insets = useSafeAreaInsets();
   const { t, L, lang } = useT();
   const [filter, setFilter] = useState<CategoryId | 'all'>('all');
   const [selected, setSelected] = useState<string | null>(null);
@@ -29,7 +30,6 @@ export default function MapScreen() {
   useEffect(() => setFocus(null), [barangay]);
 
   const locate = async () => {
-    haptic.tap();
     setLocating(true);
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
@@ -62,6 +62,7 @@ export default function MapScreen() {
   const center = focus ?? (b ? { lat: b.lat, lng: b.lng } : NAGA_CENTER);
   const sel = reports.find((r) => r.id === selected);
   const selCat = sel ? categoryById(sel.category) : null;
+  const confirmedThis = !!sel && confirmed.includes(sel.id);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -110,20 +111,19 @@ export default function MapScreen() {
         </View>
       </SafeAreaView>
 
-      <View style={styles.bottom} pointerEvents="box-none">
-        <Pressable
-          onPress={locate}
-          disabled={locating}
-          style={({ pressed }) => [styles.locate, pressed && { backgroundColor: colors.sunken }]}
-          accessibilityRole="button"
-          accessibilityLabel="Show my location"
-        >
-          {locating ? <ActivityIndicator color={colors.primary} /> : <Feather name="crosshair" size={20} color={me ? colors.primary : colors.text} />}
-        </Pressable>
+      <View style={[styles.bottom, { bottom: insets.bottom + 104 }]} pointerEvents="box-none">
+        {outbox.length ? (
+          <Pressable onPress={refresh} style={styles.syncPill} accessibilityRole="button">
+            <Feather name="upload-cloud" size={14} color={colors.primaryDeep} />
+            <Text style={styles.syncText}>
+              {outbox.length} waiting to send{syncing ? '…' : '. Tap to retry.'}
+            </Text>
+          </Pressable>
+        ) : null}
         {sel && selCat ? (
           <FadeIn key={sel.id} from={40} duration={260} style={styles.detail}>
             <View style={[styles.detailStripe, { backgroundColor: selCat.color }]} />
-            <View style={{ padding: 16, paddingLeft: 20, gap: 8 }}>
+            <View style={{ padding: 16, paddingLeft: 20, gap: 10 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                 <View style={[styles.catIcon, { backgroundColor: `${selCat.color}22` }]}>
                   <Feather name={selCat.icon as keyof typeof Feather.glyphMap} size={16} color={selCat.color} />
@@ -134,8 +134,8 @@ export default function MapScreen() {
                 <View style={[styles.sev, { backgroundColor: severityColors[sel.severity - 1] }]}>
                   <Text style={styles.sevText}>{sel.severity}/5</Text>
                 </View>
-                <Pressable onPress={() => setSelected(null)} hitSlop={12} accessibilityLabel="Close" style={{ marginLeft: 'auto' }}>
-                  <Feather name="x" size={20} color={colors.muted} />
+                <Pressable onPress={() => setSelected(null)} accessibilityRole="button" accessibilityLabel="Close" style={styles.close}>
+                  <Feather name="x" size={18} color={colors.text} />
                 </Pressable>
               </View>
               <Text style={styles.desc}>{sel.description}</Text>
@@ -148,9 +148,28 @@ export default function MapScreen() {
                 />
                 <Meta icon="users" text={L(GROUPS.find((g) => g.id === sel.group)!.label)} />
               </View>
-              <View style={styles.reviewed}>
-                <Feather name="check-circle" size={13} color={colors.success} />
-                <Text style={styles.reviewedText}>Reviewed by a youth coordinator</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <View style={[styles.reviewed, { flex: 1 }]}>
+                  <Feather name="check-circle" size={13} color={colors.success} />
+                  <Text style={styles.reviewedText}>Reviewed</Text>
+                </View>
+                <Pressable
+                  onPress={() => {
+                    if (confirmedThis) return;
+                    haptic.success();
+                    confirm(sel.id);
+                  }}
+                  disabled={confirmedThis}
+                  accessibilityRole="button"
+                  accessibilityLabel={confirmedThis ? 'You said me too' : 'Me too: I feel unsafe here too'}
+                  style={({ pressed }) => [styles.meToo, confirmedThis && styles.meTooDone, pressed && { opacity: 0.8 }]}
+                >
+                  <Feather name={confirmedThis ? 'check' : 'thumbs-up'} size={15} color={confirmedThis ? colors.text : '#fff'} />
+                  <Text style={[styles.meTooText, confirmedThis && { color: colors.text }]}>
+                    {confirmedThis ? 'You too' : 'Me too'}
+                    {sel.confirmations ? ` · ${sel.confirmations}` : ''}
+                  </Text>
+                </Pressable>
               </View>
             </View>
           </FadeIn>
@@ -162,26 +181,55 @@ export default function MapScreen() {
             </Text>
           </View>
         )}
-        <View style={styles.actions}>
-          <Pressable
-            style={({ pressed }) => [styles.chatBtn, pressed && styles.sink]}
-            onPress={() => router.push('/chat')}
-            accessibilityRole="button"
-            accessibilityLabel={t('askBayanihan')}
-          >
-            <Feather name="message-circle" size={22} color="#fff" />
-          </Pressable>
-          <Pressable
-            style={({ pressed }) => [styles.fab, pressed && styles.sink]}
-            onPress={() => router.push('/report')}
-            accessibilityRole="button"
-          >
-            <Feather name="plus" size={20} color="#fff" />
-            <Text style={styles.fabText}>{t('reportConcern')}</Text>
-          </Pressable>
+        <View style={styles.actions} pointerEvents="box-none">
+          <RoundButton icon="message-circle" label={t('askBayanihan')} bg={colors.primary} edge={colors.primaryDeep} onPress={() => router.push('/chat')} />
+          <View style={{ flex: 1 }} />
+          <RoundButton icon="phone-call" label="Get help now" bg={colors.danger} edge="#A8182D" onPress={() => router.push('/hotlines')} />
+          <RoundButton
+            icon="crosshair"
+            label="Show my location"
+            bg={colors.card}
+            edge="#D9D2EE"
+            fg={me ? colors.primary : colors.text}
+            busy={locating}
+            onPress={locate}
+          />
         </View>
       </View>
     </View>
+  );
+}
+
+function RoundButton({
+  icon,
+  label,
+  bg,
+  edge,
+  fg = '#fff',
+  busy,
+  onPress,
+}: {
+  icon: keyof typeof Feather.glyphMap;
+  label: string;
+  bg: string;
+  edge: string;
+  fg?: string;
+  busy?: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={() => {
+        haptic.tap();
+        onPress();
+      }}
+      disabled={busy}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      style={({ pressed }) => [styles.round, { backgroundColor: bg, borderBottomColor: edge }, pressed && styles.sink]}
+    >
+      {busy ? <ActivityIndicator color={fg === '#fff' ? '#fff' : colors.primary} /> : <Feather name={icon} size={22} color={fg} />}
+    </Pressable>
   );
 }
 
@@ -207,17 +255,31 @@ const styles = StyleSheet.create({
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   brand: { fontFamily: fonts.heading, fontSize: 22, lineHeight: 26, color: colors.text, letterSpacing: -0.5 },
   tagline: { fontFamily: fonts.body, ...type.small, color: colors.muted },
-  bottom: { position: 'absolute', bottom: 16, left: 12, right: 12, gap: 10 },
-  locate: {
-    alignSelf: 'flex-end',
-    width: 48,
-    height: 48,
-    borderRadius: 16,
-    backgroundColor: colors.card,
+  bottom: { position: 'absolute', left: 12, right: 12, gap: 10 },
+  round: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     alignItems: 'center',
     justifyContent: 'center',
+    borderBottomWidth: chunk,
     ...shadow,
   },
+  close: { marginLeft: 'auto', width: 36, height: 36, borderRadius: 18, backgroundColor: colors.sunken, alignItems: 'center', justifyContent: 'center' },
+  meToo: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.primary, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 9 },
+  meTooDone: { backgroundColor: colors.lime },
+  meTooText: { fontFamily: fonts.bold, fontSize: 14, color: '#fff' },
+  syncPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'center',
+    backgroundColor: colors.primarySoft,
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+  },
+  syncText: { fontFamily: fonts.bold, fontSize: 13, color: colors.primaryDeep },
   pill: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -232,36 +294,7 @@ const styles = StyleSheet.create({
   },
   pillText: { fontFamily: fonts.medium, fontSize: 13, color: colors.text },
   actions: { flexDirection: 'row', gap: 10, alignItems: 'center' },
-  chatBtn: {
-    width: 60,
-    height: 60,
-    borderRadius: 20,
-    backgroundColor: colors.primary,
-    borderBottomWidth: chunk,
-    borderBottomColor: colors.primaryDeep,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...shadow,
-  },
   sink: { transform: [{ translateY: chunk - 1 }], borderBottomWidth: 1, marginBottom: chunk - 1 },
-  fab: {
-    flex: 1,
-    height: 60,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: colors.accent,
-    borderRadius: 20,
-    borderBottomWidth: chunk,
-    borderBottomColor: colors.accentDeep,
-    shadowColor: colors.accent,
-    shadowOpacity: 0.4,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 6,
-  },
-  fabText: { fontFamily: fonts.heading, fontSize: 17, color: '#fff' },
   detail: { backgroundColor: colors.card, borderRadius: radius.lg, overflow: 'hidden', ...shadow },
   detailStripe: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 6 },
   catIcon: { width: 34, height: 34, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },

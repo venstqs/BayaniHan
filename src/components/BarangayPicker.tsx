@@ -1,7 +1,7 @@
 import Feather from '@expo/vector-icons/Feather';
 import { useState } from 'react';
 import { FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BARANGAYS, PILOT_BARANGAY } from '@/lib/data';
 import { useT } from '@/lib/i18n';
 import { haptic } from '@/lib/motion';
@@ -18,6 +18,8 @@ interface Props {
 export default function BarangayPicker({ value, onChange, allowAll, compact }: Props) {
   const { t } = useT();
   const [open, setOpen] = useState(false);
+  // Android draws modals under the status bar, so pad with the real insets (SafeAreaView inside a Modal reports 0).
+  const insets = useSafeAreaInsets();
   const [q, setQ] = useState('');
   const items = [...(allowAll ? [null] : []), ...BARANGAYS.map((b) => b.name)].filter(
     (n) => !q || (n ?? t('allCity')).toLowerCase().includes(q.toLowerCase()),
@@ -32,11 +34,11 @@ export default function BarangayPicker({ value, onChange, allowAll, compact }: P
         </Text>
         <Feather name="chevron-down" size={16} color={colors.muted} />
       </Pressable>
-      <Modal visible={open} animationType="slide" onRequestClose={() => setOpen(false)}>
-        <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
+      <Modal visible={open} animationType="slide" statusBarTranslucent navigationBarTranslucent onRequestClose={() => setOpen(false)}>
+        <View style={{ flex: 1, backgroundColor: colors.bg, paddingTop: insets.top + 8, paddingBottom: insets.bottom }}>
           <View style={styles.header}>
             <Text style={styles.title}>{t('chooseBarangay')}</Text>
-            <Pressable onPress={() => setOpen(false)} hitSlop={10}>
+            <Pressable onPress={() => setOpen(false)} hitSlop={8} accessibilityRole="button" accessibilityLabel="Close" style={styles.close}>
               <Feather name="x" size={24} color={colors.text} />
             </Pressable>
           </View>
@@ -70,7 +72,7 @@ export default function BarangayPicker({ value, onChange, allowAll, compact }: P
               );
             }}
           />
-        </SafeAreaView>
+        </View>
       </Modal>
     </>
   );
@@ -90,7 +92,8 @@ const styles = StyleSheet.create({
   },
   compact: { borderRadius: radius.pill, paddingVertical: 8 },
   triggerText: { flex: 1, fontFamily: fonts.medium, fontSize: 14, color: colors.text },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 12 },
+  close: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.sunken, alignItems: 'center', justifyContent: 'center' },
   title: { fontFamily: fonts.heading, fontSize: 22, color: colors.text },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 14, paddingHorizontal: 12, borderRadius: radius.sm },
   rowText: { flex: 1, fontFamily: fonts.body, fontSize: 16, color: colors.text },

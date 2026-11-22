@@ -36,10 +36,16 @@ function ReportCard({ r }: { r: Report }) {
   const toast = useToast();
 
   /** Change status with a smooth list update and an Undo toast (so no "are you sure?" popup is needed). */
+  const fail = (e: unknown) => {
+    haptic.warn();
+    animateLayout();
+    toast({ message: e instanceof Error ? e.message : 'Could not save. Check your connection.', icon: 'alert-circle' });
+  };
+
   const act = (action: Status, message: string, note?: string) => {
     const prev = r.status;
     animateLayout();
-    moderate(r.id, action, note);
+    moderate(r.id, action, note).catch(fail);
     action === 'rejected' ? haptic.warn() : haptic.success();
     toast({
       message,
@@ -48,7 +54,7 @@ function ReportCard({ r }: { r: Report }) {
         label: 'Undo',
         onPress: () => {
           animateLayout();
-          moderate(r.id, prev, 'Undone');
+          moderate(r.id, prev, 'Undone').catch(fail);
         },
       },
     });
@@ -87,7 +93,7 @@ function ReportCard({ r }: { r: Report }) {
               disabled={desc.trim().length < 5}
               onPress={() => {
                 animateLayout();
-                editReport(r.id, { description: desc.trim(), category: cat });
+                editReport(r.id, { description: desc.trim(), category: cat }).catch(fail);
                 setEditing(false);
                 toast({ message: 'Changes saved.', icon: 'check' });
               }}
@@ -170,7 +176,7 @@ function Meta({ icon, text }: { icon: keyof typeof Feather.glyphMap; text: strin
 }
 
 export default function Moderation() {
-  const { reports, surveys, resetDemo } = useStore();
+  const { reports, surveys, resetDemo, online } = useStore();
   const [filter, setFilter] = useState<Status>('pending');
   const count = (s: Status) => reports.filter((r) => r.status === s).length;
   const list = reports.filter((r) => r.status === filter);
@@ -231,17 +237,19 @@ export default function Moderation() {
           </Card>
         );
       })}
-      <Button
-        title="Reset demo data"
-        variant="ghost"
-        icon="rotate-ccw"
-        onPress={() =>
-          Alert.alert('Reset demo data?', 'This deletes new reports and survey answers on this phone and restores the samples.', [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Reset', style: 'destructive', onPress: resetDemo },
-          ])
-        }
-      />
+      {!online ? (
+        <Button
+          title="Reset demo data"
+          variant="ghost"
+          icon="rotate-ccw"
+          onPress={() =>
+            Alert.alert('Reset demo data?', 'This deletes new reports and survey answers on this phone and restores the samples.', [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Reset', style: 'destructive', onPress: resetDemo },
+            ])
+          }
+        />
+      ) : null}
     </>
   );
 }

@@ -37,6 +37,8 @@ function Root() {
       <Stack.Screen name="route" options={{ title: 'Safer route' }} />
       <Stack.Screen name="about" options={{ title: 'About and privacy' }} />
       <Stack.Screen name="admin" options={{ title: 'Coordinator review' }} />
+      <Stack.Screen name="my-reports" options={{ title: '' }} />
+      <Stack.Screen name="hotlines" options={{ title: 'Get help now' }} />
     </Stack>
   );
 }

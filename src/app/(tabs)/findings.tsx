@@ -9,7 +9,7 @@ import { useStore } from '@/lib/store';
 import { colors, severityColors } from '@/lib/theme';
 
 export default function FindingsScreen() {
-  const { reports, surveys, barangay, setBarangay } = useStore();
+  const { reports, surveys, barangay, setBarangay, online, refresh, syncing } = useStore();
   const { L, t } = useT();
   const f = computeFindings(reports, surveys, barangay);
   const maxCat = Math.max(1, ...f.byCategory.map((c) => c.count));
@@ -20,7 +20,7 @@ export default function FindingsScreen() {
   const sevColor = f.avgSeverity ? severityColors[Math.min(4, Math.max(0, Math.round(f.avgSeverity) - 1))] : colors.text;
 
   return (
-    <Screen>
+    <Screen tabBarSpace onRefresh={online ? refresh : undefined} refreshing={syncing}>
       <PageHeader
         context="What young people are reporting"
         title={barangay ? barangay : 'Naga City findings'}

@@ -2,7 +2,7 @@ import Feather from '@expo/vector-icons/Feather';
 import { Href, router } from 'expo-router';
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { LangToggle, Logo } from '@/components/Brand';
-import { Body, Card, Screen, Small } from '@/components/ui';
+import { Body, Button, Card, Screen, Small } from '@/components/ui';
 import { useT } from '@/lib/i18n';
 import { useStore } from '@/lib/store';
 import { colors, fonts, radius } from '@/lib/theme';
@@ -10,18 +10,20 @@ import { colors, fonts, radius } from '@/lib/theme';
 type Item = { icon: keyof typeof Feather.glyphMap; title: string; sub: string; href: Href };
 
 const TOOLS: Item[] = [
+  { icon: 'clock', title: 'My reports', sub: 'Follow the review status of reports you sent', href: '/my-reports' },
+  { icon: 'phone-call', title: 'Get help now', sub: 'Hotlines, share your location, safety tips', href: '/hotlines' },
   { icon: 'navigation', title: 'Safer route', sub: 'Compare walking routes against reported concerns', href: '/route' },
   { icon: 'message-circle', title: 'Ask BayaniHan', sub: 'Find the right hotline or office', href: '/chat' },
   { icon: 'shield', title: 'About and privacy', sub: 'How your data is protected', href: '/about' },
 ];
 
 export default function MoreScreen() {
-  const { reports } = useStore();
+  const { reports, mine, online, outbox, syncing, syncError, lastSync, refresh } = useStore();
   const { t } = useT();
   const pending = reports.filter((r) => r.status === 'pending').length;
 
   return (
-    <Screen>
+    <Screen tabBarSpace>
       <View style={styles.hero}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
           <Logo size={48} />
@@ -48,8 +50,25 @@ export default function MoreScreen() {
 
       <View style={{ gap: 10 }}>
         {TOOLS.map((it) => (
-          <Row key={it.title} item={it} />
+          <Row key={it.title} item={it} badge={it.href === '/my-reports' ? mine.length : undefined} badgeTone="soft" />
         ))}
+      </View>
+
+      <View style={styles.status}>
+        <View style={[styles.statusDot, { backgroundColor: !online ? colors.warning : syncError ? colors.danger : colors.success }]} />
+        <View style={{ flex: 1, gap: 2 }}>
+          <Text style={styles.title}>{!online ? 'Demo mode' : syncError ? 'Offline' : 'Connected'}</Text>
+          <Small>
+            {!online
+              ? 'No server connected. Reports stay on this phone.'
+              : syncError
+                ? `${syncError}${outbox.length ? ` ${outbox.length} item(s) will send automatically.` : ''}`
+                : lastSync
+                  ? `Up to date as of ${new Date(lastSync).toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit' })}.${outbox.length ? ` Sending ${outbox.length}…` : ''}`
+                  : 'Syncing…'}
+          </Small>
+        </View>
+        {online ? <Button size="sm" variant="soft" title={syncing ? 'Syncing…' : 'Sync'} icon="refresh-cw" onPress={refresh} disabled={syncing} /> : null}
       </View>
 
       <Text style={styles.groupLabel}>For coordinators</Text>
@@ -65,7 +84,7 @@ export default function MoreScreen() {
   );
 }
 
-function Row({ item, badge }: { item: Item; badge?: number }) {
+function Row({ item, badge, badgeTone = 'accent' }: { item: Item; badge?: number; badgeTone?: 'accent' | 'soft' }) {
   return (
     <Card onPress={() => router.push(item.href)} style={styles.row} accessibilityLabel={item.title}>
       <View style={styles.icon}>
@@ -78,8 +97,8 @@ function Row({ item, badge }: { item: Item; badge?: number }) {
         </Body>
       </View>
       {badge ? (
-        <View style={styles.badge} accessibilityLabel={`${badge} waiting for review`}>
-          <Text style={styles.badgeText}>{badge}</Text>
+        <View style={[styles.badge, badgeTone === 'soft' && { backgroundColor: colors.primarySoft }]} accessibilityLabel={`${badge}`}>
+          <Text style={[styles.badgeText, badgeTone === 'soft' && { color: colors.primary }]}>{badge}</Text>
         </View>
       ) : null}
       <Feather name="chevron-right" size={18} color={colors.faint} />
@@ -88,6 +107,17 @@ function Row({ item, badge }: { item: Item; badge?: number }) {
 }
 
 const styles = StyleSheet.create({
+  status: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: colors.card,
+    borderRadius: radius.md,
+    borderWidth: 2,
+    borderColor: colors.border,
+    padding: 14,
+  },
+  statusDot: { width: 12, height: 12, borderRadius: 6 },
   hero: { backgroundColor: colors.primary, borderRadius: radius.lg, padding: 20, gap: 16, borderBottomWidth: 5, borderBottomColor: colors.primaryDeep },
   heroTitle: { fontFamily: fonts.heading, fontSize: 26, lineHeight: 30, color: '#fff', letterSpacing: -0.5 },
   heroSub: { fontFamily: fonts.bold, fontSize: 13, color: colors.lime },

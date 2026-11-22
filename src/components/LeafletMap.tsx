@@ -3,6 +3,7 @@ import { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, Pressable, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { WebView, WebViewMessageEvent } from 'react-native-webview';
 import { colors, fonts, radius, shadow } from '@/lib/theme';
+import { LEAFLET_CSS, LEAFLET_JS } from './leafletSource';
 import { ScrollLockContext } from './ui';
 
 export interface MapMarker {
@@ -31,8 +32,8 @@ interface Props {
 
 const HTML = `<!DOCTYPE html><html><head>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>${LEAFLET_CSS}</style>
+<script>${LEAFLET_JS}</script>
 <style>
  html,body,#map{margin:0;padding:0;height:100%;width:100%;background:#EFEBFA}
  .pin{background:none;border:none}
@@ -45,11 +46,25 @@ const HTML = `<!DOCTYPE html><html><head>
  var post=function(o){window.ReactNativeWebView&&window.ReactNativeWebView.postMessage(JSON.stringify(o))};
  if(typeof L==='undefined'){post({type:'offline'});}
  var map=L.map('map',{zoomControl:false,attributionControl:true});
- var tiles=L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{maxZoom:19,subdomains:'abcd',
-   attribution:'&copy; OpenStreetMap &copy; CARTO'}).addTo(map);
- var tilesOk=true;
- tiles.on('tileerror',function(){if(tilesOk){tilesOk=false;post({type:'tiles',ok:false});}});
- tiles.on('tileload',function(){if(!tilesOk){tilesOk=true;post({type:'tiles',ok:true});}});
+ // Map tiles need no API key. CARTO first; if it keeps failing, fall back to OpenStreetMap's own servers.
+ var SOURCES=[
+   {url:'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',o:{maxZoom:19,subdomains:'abcd',attribution:'&copy; OpenStreetMap &copy; CARTO'}},
+   {url:'https://tile.openstreetmap.org/{z}/{x}/{y}.png',o:{maxZoom:19,attribution:'&copy; OpenStreetMap'}}
+ ];
+ var src=0, tiles=null, errs=0, loads=0, tilesOk=true;
+ function useSource(i){
+   if(tiles){map.removeLayer(tiles);}
+   src=i; errs=0; loads=0;
+   tiles=L.tileLayer(SOURCES[i].url,SOURCES[i].o).addTo(map);
+   tiles.on('tileerror',function(){
+     errs++;
+     if(loads===0&&errs>=4&&src<SOURCES.length-1){useSource(src+1);return;}
+     if(loads===0&&errs>=4&&tilesOk){tilesOk=false;post({type:'tiles',ok:false});}
+   });
+   tiles.on('tileload',function(){loads++;if(!tilesOk){tilesOk=true;post({type:'tiles',ok:true});}});
+ }
+ useSource(0);
+ window.__retry=function(){tilesOk=true;useSource(0);};
  var layer=L.layerGroup().addTo(map); var routeLayer=null; var lastKey=null; var meMarker=null;
  function pin(color,label){
    var size=label?34:24;
@@ -155,7 +170,8 @@ export default function LeafletMap({
         ref={ref}
         onError={() => setOffline(true)}
         originWhitelist={['*']}
-        source={{ html: HTML }}
+        // A real https base URL gives tile requests a Referer header, which OpenStreetMap's tile policy requires.
+        source={{ html: HTML, baseUrl: 'https://github.com/venstqs/BayaniHan' }}
         onMessage={onMessage}
         javaScriptEnabled
         domStorageEnabled

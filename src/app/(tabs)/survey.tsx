@@ -1,7 +1,7 @@
 import Feather from '@expo/vector-icons/Feather';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import BarangayPicker from '@/components/BarangayPicker';
 import { Button, Checkbox, Chip, ChipRow, Field, PageHeader, Screen, Section, Small } from '@/components/ui';
 import { FEELINGS, GROUPS, TIMES, WANTS } from '@/lib/data';
@@ -31,16 +31,27 @@ export default function SurveyScreen() {
   const [comment, setComment] = useState('');
   const [consent, setConsent] = useState(false);
   const [sent, setSent] = useState(false);
+  const [queued, setQueued] = useState(false);
+  const [sending, setSending] = useState(false);
 
   const toggle = (id: string) => setWants((w) => (w.includes(id) ? w.filter((x) => x !== id) : [...w, id]));
   const missing = [!barangay && 'barangay', !feeling && 'how safe you feel', !consent && 'the consent box'].filter(Boolean) as string[];
   const ok = missing.length === 0;
 
-  const submit = () => {
-    if (!ok) return;
-    addSurvey({ barangay: barangay!, feeling: feeling!, timeOfDay, group, wants, comment: comment.trim() });
-    haptic.success();
-    setSent(true);
+  const submit = async () => {
+    if (!ok || sending) return;
+    setSending(true);
+    try {
+      const res = await addSurvey({ barangay: barangay!, feeling: feeling!, timeOfDay, group, wants, comment: comment.trim() });
+      setQueued(res.queued);
+      haptic.success();
+      setSent(true);
+    } catch (e) {
+      haptic.warn();
+      Alert.alert('Answers not sent', e instanceof Error ? e.message : 'Please try again.');
+    } finally {
+      setSending(false);
+    }
   };
 
   const reset = () => {
@@ -53,7 +64,7 @@ export default function SurveyScreen() {
 
   if (sent) {
     return (
-      <Screen>
+      <Screen tabBarSpace>
         <View style={styles.done}>
           <PopIn>
             <View style={styles.doneIcon}>
@@ -64,7 +75,9 @@ export default function SurveyScreen() {
             <Text style={styles.doneTitle}>{t('surveySentTitle')}</Text>
           </FadeIn>
           <FadeIn delay={250}>
-            <Text style={styles.doneBody}>{t('surveySentBody')}</Text>
+            <Text style={styles.doneBody}>
+              {queued ? 'You’re offline right now. Your answers are saved and will be sent automatically when you’re back online.' : t('surveySentBody')}
+            </Text>
           </FadeIn>
           <FadeIn delay={350} style={{ alignSelf: 'stretch', gap: 10, marginTop: 12 }}>
             <Button title="See the findings" icon="bar-chart-2" onPress={() => { reset(); router.navigate('/findings'); }} />
@@ -76,7 +89,7 @@ export default function SurveyScreen() {
   }
 
   return (
-    <Screen>
+    <Screen tabBarSpace>
       <PageHeader context="Anonymous, for youth aged 15–30" title={t('surveyTitle')} intro={t('surveyIntro')} />
 
       <Section step={1} title="Barangay" done={!!barangay}>
@@ -147,7 +160,7 @@ export default function SurveyScreen() {
         onChange={setConsent}
         label="I agree to share these answers anonymously for the BayaniHan youth safety study. If I am under 18, a parent or guardian knows I am taking part."
       />
-      <Button title={t('sendAnswers')} variant="accent" icon="send" onPress={submit} disabled={!ok} />
+      <Button title={sending ? 'Sending…' : t('sendAnswers')} variant="accent" icon="send" onPress={submit} disabled={!ok || sending} />
       {!ok ? (
         <Small style={{ textAlign: 'center' }}>
           {t('stillNeeded')} {missing.join(', ')}.

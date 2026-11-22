@@ -27,6 +27,8 @@ export interface Report {
   lat: number;
   lng: number;
   status: Status;
+  /** "Me too" count from other young people (approved reports only). */
+  confirmations?: number;
   createdAt: string;
   log: ModerationEntry[];
 }
